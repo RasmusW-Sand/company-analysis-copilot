@@ -1,19 +1,24 @@
+import re
+import sys
+import subprocess
+from pathlib import Path
+from datetime import datetime, date, timedelta
+
 import streamlit as st
-import plotly.graph_objects as go
-import plotly.express as px
 from dotenv import load_dotenv
 load_dotenv()
-from export.pdf_export import generate_pdf
-from pipeline.snapshot import SnapshotBuilder
-from models import CompanySnapshot
+
+from watchlist.store import load_watchlist
+
+PROJ_ROOT = Path(__file__).parent
+LOG_PATH  = PROJ_ROOT / "watchlist" / "monitor.log"
 
 st.set_page_config(
     page_title="Company Analysis Copilot",
-    page_icon="nordic_flag",
-    layout="wide"
+    page_icon="📋",
+    layout="wide",
 )
 
-# ── Styling ──────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
     .metric-card {
@@ -40,238 +45,209 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ── Header ───────────────────────────────────────────────────────────────────
-st.title("Company Analysis Copilot")
-st.caption("Nordisk M&A og investor analyse — ticker, årsrapport eller nettside")
+# ── Log helpers ───────────────────────────────────────────────────────────────
 
-# ── Input ────────────────────────────────────────────────────────────────────
-col_input, col_btn = st.columns([4, 1])
-with col_input:
-    user_input = st.text_input(
-        label="Input",
-        placeholder="f.eks. EQNR.OL, KAHOT.OL, eller lim inn URL til IR-side",
-        label_visibility="collapsed"
-    )
-with col_btn:
-    analyse_btn  = st.button("Analyser", type="primary", use_container_width=True)
-    force_reload = st.button("Tving ny analyse", type="secondary", use_container_width=True)
+@st.cache_data(ttl=300)
+def read_log() -> str:
+    if not LOG_PATH.exists():
+        return ""
+    return LOG_PATH.read_text(encoding="utf-8", errors="replace")
 
-# PDF-upload
-uploaded_pdf = st.file_uploader(
-    "Eller last opp årsrapport (PDF)",
-    type=["pdf"],
-    label_visibility="collapsed"
-)
 
-# ── Pipeline ─────────────────────────────────────────────────────────────────
-if analyse_btn and (user_input or uploaded_pdf):
-
-    # Håndter PDF-upload
-    if uploaded_pdf:
-        import tempfile, os
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(uploaded_pdf.read())
-            tmp_path = tmp.name
-        input_value = tmp_path
-    else:
-        input_value = user_input
-
-    with st.spinner("Analyserer..."):
+def _parse_ts(line: str) -> datetime | None:
+    m = re.search(r'\[(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2})', line)
+    if m:
         try:
-            from watchlist.store import save_snapshot_cache, load_snapshot_cache
+            return datetime.strptime(m.group(1), "%d/%m/%Y %H:%M:%S")
+        except ValueError:
+            pass
+    return None
 
-            cached = None if force_reload else load_snapshot_cache(input_value)
-            if cached:
-                st.info("Hentet fra cache — trykk 'Tving ny analyse' for ferske data")
-                snapshot = cached
-            else:
-                builder  = SnapshotBuilder()
-                snapshot = builder.build(input_value)
-                save_snapshot_cache(snapshot)
 
-            # Rydd opp temp-fil
-            if uploaded_pdf:
-                os.unlink(tmp_path)
+def last_ok_run(log: str) -> datetime | None:
+    result = None
+    for line in log.splitlines():
+        if "=== Monitor fullfort OK ===" in line:
+            ts = _parse_ts(line)
+            if ts:
+                result = ts
+    return result
 
-            # Lagre i session state så siden ikke re-kjører
-            st.session_state["snapshot"] = snapshot
 
-        except Exception as e:
-            st.error(f"Feil under analyse: {e}")
-            st.stop()
+def alerts_last_7d(log: str) -> int:
+    """Teller kjøringer med triggere de siste 7 dagene."""
+    cutoff = datetime.now() - timedelta(days=7)
+    count  = 0
+    current_ts: datetime | None = None
+    for line in log.splitlines():
+        if "=== Monitor startet ===" in line:
+            current_ts = _parse_ts(line)
+        elif current_ts and current_ts >= cutoff and "trigger(e) funnet" in line:
+            count += 1
+    return count
 
-# ── Dashboard ────────────────────────────────────────────────────────────────
-snapshot: CompanySnapshot = st.session_state.get("snapshot")
 
-if snapshot:
-    st.divider()
+def next_earnings_entry(watchlist: list[dict]) -> tuple[str, str] | None:
+    """Returnerer (selskapsnavn, dato-streng) for neste kommende rapport."""
+    today     = date.today()
+    best_name: str | None = None
+    best_date: date | None = None
+    for e in watchlist:
+        raw = e.get("next_earnings_date")
+        if not raw:
+            continue
+        try:
+            d = date.fromisoformat(raw)
+            if d >= today and (best_date is None or d < best_date):
+                best_date = d
+                best_name = e.get("company_name") or e.get("ticker", "")
+        except ValueError:
+            pass
+    if best_name and best_date:
+        return best_name, best_date.isoformat()
+    return None
 
-    # Selskapsnavn og metadata
-    st.subheader(snapshot.company_name)
-    meta_cols = st.columns(3)
-    with meta_cols[0]:
-        st.caption(f"Ticker: {snapshot.ticker or 'N/A'}")
-    with meta_cols[1]:
-        st.caption(f"Hovedkontor: {snapshot.headquarters}")
-    with meta_cols[2]:
-        st.caption(f"Grunnlagt: {snapshot.founded or 'N/A'}")
 
-    st.write(snapshot.business_description)
-    st.divider()
+def watchlist_html(watchlist: list[dict]) -> str:
+    today = date.today()
+    rows  = ""
+    for e in watchlist:
+        ned = e.get("next_earnings_date")
+        ned_display = ned if ned else "N/A"
 
-    # ── Rad 1: Nøkkeltall ────────────────────────────────────────────────────
-    st.markdown("#### Nøkkeltall")
-    m1, m2, m3, m4, m5 = st.columns(5)
+        bg = "#f0fff4"  # grønn default
+        if ned:
+            try:
+                days_until = (date.fromisoformat(ned) - today).days
+                if 0 <= days_until <= 2:
+                    bg = "#fee2e2"  # rød ved nær rapport
+            except ValueError:
+                pass
 
-    def metric(col, label, value, suffix=""):
-        with col:
-            if value is not None:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-label">{label}</div>
-                    <div class="metric-value">{value:,.1f}{suffix}</div>
-                </div>""", unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-label">{label}</div>
-                    <div class="metric-value">N/A</div>
-                </div>""", unsafe_allow_html=True)
+        added     = (e.get("added_at") or "")[:10]
+        last_chk  = (e.get("last_checked") or "")[:16].replace("T", " ")
+        baseline  = f"${e.get('baseline_price'):.2f}" if e.get("baseline_price") else "N/A"
+        threshold = f"{e.get('price_threshold_pct', 5.0):.1f}%"
 
-    metric(m1, "Market cap (MNOK)", snapshot.market_cap_mnok)
-    metric(m2, "EV/EBITDA", snapshot.ev_ebitda, "x")
-    metric(m3, "EBITDA-margin", snapshot.ebitda_margin, "%")
-    metric(m4, "Netto gjeld/EBITDA", snapshot.net_debt_ebitda, "x")
-    metric(m5, "Omsetning CAGR 3y", snapshot.revenue_cagr_3y, "%")
+        rows += f"""
+        <tr style="background:{bg};">
+            <td style="padding:10px;border-bottom:1px solid #dee2e6;">{e.get('company_name', '')}</td>
+            <td style="padding:10px;border-bottom:1px solid #dee2e6;font-weight:600;">{e.get('ticker', '')}</td>
+            <td style="padding:10px;border-bottom:1px solid #dee2e6;">{added}</td>
+            <td style="padding:10px;border-bottom:1px solid #dee2e6;">{threshold}</td>
+            <td style="padding:10px;border-bottom:1px solid #dee2e6;">{baseline}</td>
+            <td style="padding:10px;border-bottom:1px solid #dee2e6;">{ned_display}</td>
+            <td style="padding:10px;border-bottom:1px solid #dee2e6;">{last_chk}</td>
+        </tr>
+        """
 
-    st.divider()
+    return f"""
+    <table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">
+        <thead>
+            <tr style="background:#0f2d4a;color:white;">
+                <th style="padding:10px;text-align:left;">Selskap</th>
+                <th style="padding:10px;text-align:left;">Ticker</th>
+                <th style="padding:10px;text-align:left;">Lagt til</th>
+                <th style="padding:10px;text-align:left;">Pristerskel</th>
+                <th style="padding:10px;text-align:left;">Baseline-pris</th>
+                <th style="padding:10px;text-align:left;">Neste rapport</th>
+                <th style="padding:10px;text-align:left;">Siste sjekk</th>
+            </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+    </table>
+    """
 
-    # ── Rad 2: Geo + Peer comparison ─────────────────────────────────────────
-    col_geo, col_peer = st.columns([1, 2])
 
-    with col_geo:
-        st.markdown("#### Geografisk eksponering")
-        if snapshot.geographic_exposure:
-            geo_data = {
-                k: v for k, v in snapshot.geographic_exposure.items()
-                if v > 0
-            }
-            fig_geo = go.Figure(go.Pie(
-                labels=list(geo_data.keys()),
-                values=list(geo_data.values()),
-                hole=0.45,
-                textinfo="label+percent",
-                textfont_size=12,
-                marker_colors=px.colors.qualitative.Set2,
-            ))
-            fig_geo.update_layout(
-                showlegend=False,
-                margin=dict(t=10, b=10, l=10, r=10),
-                height=240,
-            )
-            st.plotly_chart(fig_geo, width='stretch')
+# ── UI ────────────────────────────────────────────────────────────────────────
 
-    with col_peer:
-        st.markdown("#### Peer comparison — EV/EBITDA")
-        if snapshot.peer_multiples:
-            # Legg til selskapet selv øverst
-            all_peers = [{
-                "ticker": snapshot.ticker or snapshot.company_name,
-                "name":   snapshot.company_name,
-                "ev_ebitda": snapshot.ev_ebitda,
-            }] + [
-                {"ticker": p.ticker, "name": p.name, "ev_ebitda": p.ev_ebitda}
-                for p in snapshot.peer_multiples
-                if p.ev_ebitda is not None
-            ]
+# Load data
+log       = read_log()
+watchlist = load_watchlist()
+last_run  = last_ok_run(log)
+last_run_str = last_run.strftime("%d.%m.%Y %H:%M") if last_run else "Aldri kjørt"
 
-            labels  = [p["ticker"] for p in all_peers]
-            values  = [p["ev_ebitda"] or 0 for p in all_peers]
-            colors  = ["#3b82f6"] + ["#94a3b8"] * (len(labels) - 1)
+# Header
+st.title("Company Analysis Copilot")
+st.caption(f"Nordisk M&A og investor analyse — siste kjøring: {last_run_str}")
+st.divider()
 
-            fig_peer = go.Figure(go.Bar(
-                x=labels,
-                y=values,
-                marker_color=colors,
-                text=[f"{v:.1f}x" if v else "N/A" for v in values],
-                textposition="outside",
-            ))
-            fig_peer.update_layout(
-                yaxis_title="EV/EBITDA",
-                margin=dict(t=30, b=10, l=10, r=10),
-                height=240,
-                plot_bgcolor="white",
-                yaxis=dict(gridcolor="#f1f5f9"),
-            )
-            st.plotly_chart(fig_peer, width='stretch')
+# ── Metrics ───────────────────────────────────────────────────────────────────
+st.markdown("#### Status")
+c1, c2, c3, c4 = st.columns(4)
 
-    st.divider()
 
-    # ── Rad 3: Inntektsdrivere, risikoer, why/why not ────────────────────────
-    col_l, col_m, col_r = st.columns(3)
+def card(col, label: str, value: str) -> None:
+    with col:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">{label}</div>
+            <div class="metric-value">{value}</div>
+        </div>""", unsafe_allow_html=True)
 
-    with col_l:
-        st.markdown("#### Inntektsdrivere")
-        for driver in (snapshot.revenue_drivers or []):
-            st.markdown(f'<span class="tag">{driver}</span>',
-                       unsafe_allow_html=True)
 
-    with col_m:
-        st.markdown("#### Nøkkelrisikoer")
-        for risk in (snapshot.key_risks or []):
-            st.markdown(f'<span class="tag risk">{risk}</span>',
-                       unsafe_allow_html=True)
+card(c1, "Selskaper i watchlist", str(len(watchlist)))
+card(c2, "Varsler siste 7 dager", str(alerts_last_7d(log)))
 
-    with col_r:
-        st.markdown("#### Investor-vurdering")
-        st.markdown(
-            f'<div class="tag pro" style="display:block;margin-bottom:8px;">'
-            f'+ {snapshot.why_interesting}</div>',
-            unsafe_allow_html=True
+ne = next_earnings_entry(watchlist)
+if ne:
+    card(c3, "Neste kvartalsrapport", f"{ne[0]}<br><small style='font-size:14px;font-weight:400;'>{ne[1]}</small>")
+else:
+    card(c3, "Neste kvartalsrapport", "N/A")
+
+card(c4, "Siste monitor-kjøring", last_run_str)
+
+st.divider()
+
+# ── Watchlist table ───────────────────────────────────────────────────────────
+st.markdown("#### Watchlist")
+if watchlist:
+    st.markdown(
+        "<small style='color:#6c757d;'>"
+        "<span style='color:#dc3545;'>&#9632;</span> Kvartalsrapport innen 2 dager &nbsp;&nbsp;"
+        "<span style='color:#198754;'>&#9632;</span> Ingen umiddelbar hendelse"
+        "</small>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(watchlist_html(watchlist), unsafe_allow_html=True)
+else:
+    st.info("Watchlisten er tom. Legg til selskaper via Analyser-siden.")
+
+st.divider()
+
+# ── Kjør monitor nå ───────────────────────────────────────────────────────────
+st.markdown("#### Kjør monitor")
+
+if st.button("Kjør monitor nå", type="primary"):
+    st.cache_data.clear()
+    output_area  = st.empty()
+    full_output  = ""
+    with st.spinner("Kjører overvåking..."):
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "watchlist.monitor"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            cwd=str(PROJ_ROOT),
         )
-        st.markdown(
-            f'<div class="tag con" style="display:block;">'
-            f'- {snapshot.why_not_interesting}</div>',
-            unsafe_allow_html=True
-        )
+        for line in proc.stdout:
+            full_output += line
+            output_area.code(full_output, language="text")
+        proc.wait()
+    if proc.returncode == 0:
+        st.success("Monitor fullfort OK.")
+    else:
+        st.error(f"Monitor avsluttet med feil (kode {proc.returncode}).")
+    st.cache_data.clear()
 
-    st.divider()
+st.divider()
 
-    
-    st.markdown("#### Eksport")
-    if st.button("Last ned 1-side PDF", type="secondary"):
-        with st.spinner("Genererer PDF..."):
-            pdf_bytes = generate_pdf(snapshot)
-            st.download_button(
-                label="Klikk for å laste ned",
-                data=pdf_bytes,
-                file_name=f"{snapshot.ticker or snapshot.company_name}_snapshot.pdf",
-                mime="application/pdf",
-            )
-    from watchlist.store import add_to_watchlist, is_in_watchlist
-
-    st.divider()
-    st.markdown("#### Watchlist")
-
-    if snapshot.ticker:
-        if is_in_watchlist(snapshot.ticker):
-            st.success(f"{snapshot.ticker} er allerede i watchlisten din")
-            if st.button("Fjern fra watchlist"):
-                from watchlist.store import remove_from_watchlist
-                remove_from_watchlist(snapshot.ticker)
-                st.rerun()
-        else:
-            threshold = st.slider(
-                "Varsle ved kursendring større enn",
-                min_value=1.0,
-                max_value=20.0,
-                value=5.0,
-                step=0.5,
-                format="%.1f%%"
-            )
-            if st.button("Legg til i watchlist", type="primary"):
-                add_to_watchlist(snapshot, price_threshold_pct=threshold)
-                st.success(f"{snapshot.ticker} lagt til i watchlisten!")
-                st.rerun()
-
-
+# ── Monitor log expander ──────────────────────────────────────────────────────
+with st.expander("Monitor log — siste 20 linjer"):
+    if log:
+        last_20 = "\n".join(log.splitlines()[-20:])
+        st.code(last_20, language="text")
+    else:
+        st.info("Ingen logg funnet.")

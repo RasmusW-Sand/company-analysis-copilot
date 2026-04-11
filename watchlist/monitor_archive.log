@@ -1,0 +1,36 @@
+ 
+[11/04/2026 11:51:28.77] === Monitor startet === 
+Traceback (most recent call last):
+  File "C:\Programmering\Finans\AI agents for market research\watchlist\monitor.py", line 11, in <module>
+    from watchlist.store import (
+ModuleNotFoundError: No module named 'watchlist.store'
+[11/04/2026 11:51:40.02] FEIL: monitor.py avsluttet med kode 1 
+ 
+[11/04/2026 11:54:01.87] === Monitor startet === 
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Programmering\Finans\AI agents for market research\watchlist\monitor.py", line 184, in <module>
+    run_monitor()
+  File "C:\Programmering\Finans\AI agents for market research\watchlist\monitor.py", line 148, in run_monitor
+    print(f"  \u2192 {ticker}")
+  File "C:\Users\sandr\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 2: character maps to <undefined>
+Sjekker 1 selskaper...
+[11/04/2026 11:54:10.05] FEIL: monitor.py avsluttet med kode 1 
+ 
+[11/04/2026 11:55:14.87] === Monitor startet === 
+Sjekker 1 selskaper...
+  -> CVX
+
+Ingen vesentlige endringer funnet.
+[11/04/2026 11:55:47.48] === Monitor fullfort OK === 
+ 
+[11/04/2026 11:57:42.72] === Monitor startet === 
+Sjekker 1 selskaper...
+  -> CVX
+
+Ingen vesentlige endringer funnet.
+[11/04/2026 11:58:07.45] === Monitor fullfort OK === 
