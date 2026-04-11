@@ -53,7 +53,8 @@ with col_input:
         label_visibility="collapsed"
     )
 with col_btn:
-    analyse_btn = st.button("Analyser", type="primary", use_container_width=True)
+    analyse_btn  = st.button("Analyser", type="primary", use_container_width=True)
+    force_reload = st.button("Tving ny analyse", type="secondary", use_container_width=True)
 
 # PDF-upload
 uploaded_pdf = st.file_uploader(
@@ -77,8 +78,16 @@ if analyse_btn and (user_input or uploaded_pdf):
 
     with st.spinner("Analyserer..."):
         try:
-            builder  = SnapshotBuilder()
-            snapshot = builder.build(input_value)
+            from watchlist.store import save_snapshot_cache, load_snapshot_cache
+
+            cached = None if force_reload else load_snapshot_cache(input_value)
+            if cached:
+                st.info("Hentet fra cache — trykk 'Tving ny analyse' for ferske data")
+                snapshot = cached
+            else:
+                builder  = SnapshotBuilder()
+                snapshot = builder.build(input_value)
+                save_snapshot_cache(snapshot)
 
             # Rydd opp temp-fil
             if uploaded_pdf:
@@ -229,16 +238,40 @@ if snapshot:
     st.divider()
 
     
+    st.markdown("#### Eksport")
+    if st.button("Last ned 1-side PDF", type="secondary"):
+        with st.spinner("Genererer PDF..."):
+            pdf_bytes = generate_pdf(snapshot)
+            st.download_button(
+                label="Klikk for å laste ned",
+                data=pdf_bytes,
+                file_name=f"{snapshot.ticker or snapshot.company_name}_snapshot.pdf",
+                mime="application/pdf",
+            )
+    from watchlist.store import add_to_watchlist, is_in_watchlist
+
+    st.divider()
+    st.markdown("#### Watchlist")
+
+    if snapshot.ticker:
+        if is_in_watchlist(snapshot.ticker):
+            st.success(f"{snapshot.ticker} er allerede i watchlisten din")
+            if st.button("Fjern fra watchlist"):
+                from watchlist.store import remove_from_watchlist
+                remove_from_watchlist(snapshot.ticker)
+                st.rerun()
+        else:
+            threshold = st.slider(
+                "Varsle ved kursendring større enn",
+                min_value=1.0,
+                max_value=20.0,
+                value=5.0,
+                step=0.5,
+                format="%.1f%%"
+            )
+            if st.button("Legg til i watchlist", type="primary"):
+                add_to_watchlist(snapshot, price_threshold_pct=threshold)
+                st.success(f"{snapshot.ticker} lagt til i watchlisten!")
+                st.rerun()
 
 
-
-st.markdown("#### Eksport")
-if st.button("Last ned 1-side PDF", type="secondary"):
-    with st.spinner("Genererer PDF..."):
-        pdf_bytes = generate_pdf(snapshot)
-        st.download_button(
-            label="Klikk for å laste ned",
-            data=pdf_bytes,
-            file_name=f"{snapshot.ticker or snapshot.company_name}_snapshot.pdf",
-            mime="application/pdf",
-        )

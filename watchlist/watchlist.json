@@ -1,0 +1,13 @@
+[
+  {
+    "ticker": "CVX",
+    "company_name": "Chevron Corporation",
+    "added_at": "2026-04-11T11:02:44.835382",
+    "last_checked": "2026-04-11T11:58:06.920886",
+    "baseline_price": 188.5500030517578,
+    "price_threshold_pct": 5.0,
+    "last_ev_ebitda": 11.2,
+    "headquarters": "Houston, United States",
+    "next_earnings_date": "2026-05-01"
+  }
+]
