@@ -4,9 +4,14 @@ import subprocess
 from pathlib import Path
 from datetime import datetime, date, timedelta
 
+import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 load_dotenv()
+
+if st.session_state.get("watchlist_updated"):
+    st.session_state["watchlist_updated"] = False
+    st.rerun()
 
 from watchlist.store import load_watchlist
 
@@ -14,7 +19,7 @@ PROJ_ROOT = Path(__file__).parent
 LOG_PATH  = PROJ_ROOT / "watchlist" / "monitor.log"
 
 st.set_page_config(
-    page_title="Company Analysis Copilot",
+    page_title="Watchlist",
     page_icon="📋",
     layout="wide",
 )
@@ -108,55 +113,30 @@ def next_earnings_entry(watchlist: list[dict]) -> tuple[str, str] | None:
     return None
 
 
-def watchlist_html(watchlist: list[dict]) -> str:
+def watchlist_dataframe(watchlist: list[dict]) -> pd.DataFrame:
     today = date.today()
-    rows  = ""
+    rows = []
     for e in watchlist:
         ned = e.get("next_earnings_date")
-        ned_display = ned if ned else "N/A"
-
-        bg = "#f0fff4"  # grønn default
+        days_until = None
         if ned:
             try:
                 days_until = (date.fromisoformat(ned) - today).days
-                if 0 <= days_until <= 2:
-                    bg = "#fee2e2"  # rød ved nær rapport
             except ValueError:
                 pass
 
-        added     = (e.get("added_at") or "")[:10]
-        last_chk  = (e.get("last_checked") or "")[:16].replace("T", " ")
-        baseline  = f"${e.get('baseline_price'):.2f}" if e.get("baseline_price") else "N/A"
-        threshold = f"{e.get('price_threshold_pct', 5.0):.1f}%"
+        rows.append({
+            "Selskap":       e.get("company_name", ""),
+            "Ticker":        e.get("ticker", ""),
+            "Lagt til":      (e.get("added_at") or "")[:10],
+            "Terskel":       f"{e.get('price_threshold_pct', 5.0):.1f}%",
+            "Baseline":      f"${e.get('baseline_price'):.2f}" if e.get("baseline_price") else "N/A",
+            "Neste rapport": ned if ned else "N/A",
+            "Siste sjekk":   (e.get("last_checked") or "")[:16].replace("T", " "),
+            "_days_until":   days_until,
+        })
 
-        rows += f"""
-        <tr style="background:{bg};">
-            <td style="padding:10px;border-bottom:1px solid #dee2e6;">{e.get('company_name', '')}</td>
-            <td style="padding:10px;border-bottom:1px solid #dee2e6;font-weight:600;">{e.get('ticker', '')}</td>
-            <td style="padding:10px;border-bottom:1px solid #dee2e6;">{added}</td>
-            <td style="padding:10px;border-bottom:1px solid #dee2e6;">{threshold}</td>
-            <td style="padding:10px;border-bottom:1px solid #dee2e6;">{baseline}</td>
-            <td style="padding:10px;border-bottom:1px solid #dee2e6;">{ned_display}</td>
-            <td style="padding:10px;border-bottom:1px solid #dee2e6;">{last_chk}</td>
-        </tr>
-        """
-
-    return f"""
-    <table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">
-        <thead>
-            <tr style="background:#0f2d4a;color:white;">
-                <th style="padding:10px;text-align:left;">Selskap</th>
-                <th style="padding:10px;text-align:left;">Ticker</th>
-                <th style="padding:10px;text-align:left;">Lagt til</th>
-                <th style="padding:10px;text-align:left;">Pristerskel</th>
-                <th style="padding:10px;text-align:left;">Baseline-pris</th>
-                <th style="padding:10px;text-align:left;">Neste rapport</th>
-                <th style="padding:10px;text-align:left;">Siste sjekk</th>
-            </tr>
-        </thead>
-        <tbody>{rows}</tbody>
-    </table>
-    """
+    return pd.DataFrame(rows)
 
 
 # ── UI ────────────────────────────────────────────────────────────────────────
@@ -209,11 +189,61 @@ if watchlist:
         "</small>",
         unsafe_allow_html=True,
     )
-    st.markdown(watchlist_html(watchlist), unsafe_allow_html=True)
+    df = watchlist_dataframe(watchlist)
+
+    def highlight_earnings(row):
+        days = df.loc[row.name, "_days_until"]
+        if days is not None and 0 <= days <= 2:
+            return ["background-color: #fee2e2"] * len(row)
+        return ["background-color: #f0fff4"] * len(row)
+
+    display_df = df.drop(columns=["_days_until"])
+    styled = display_df.style.apply(highlight_earnings, axis=1)
+
+    st.dataframe(styled, use_container_width=True, hide_index=True)
 else:
     st.info("Watchlisten er tom. Legg til selskaper via Analyser-siden.")
 
 st.divider()
+
+# ── Earnings Briefs ───────────────────────────────────────────────────────────
+earnable = [e for e in watchlist if e.get("next_earnings_date")]
+if earnable:
+    st.markdown("#### Earnings Briefs")
+    st.caption("Generer et profesjonelt briefing-dokument for kommende kvartalsrapporter.")
+
+    for entry in earnable:
+        ticker      = entry.get("ticker", "")
+        company     = entry.get("company_name", ticker)
+        report_date = entry.get("next_earnings_date", "")
+
+        key_sum   = f"summary_{ticker}"
+        key_dl    = f"dl_{ticker}"
+        key_brief = f"brief_{ticker}"
+
+        with st.expander(f"{company} ({ticker}) — rapporterer {report_date}"):
+            if st.button("Generer Earnings Brief", key=key_brief, type="primary"):
+                with st.spinner(f"Genererer earnings brief for {company}..."):
+                    from agents.earnings_agent import EarningsAgent
+                    agent             = EarningsAgent()
+                    briefing, pdf_bytes = agent.prepare_report(ticker)
+                st.session_state[key_sum] = briefing.get("executive_summary", "")
+                st.session_state[key_dl]  = pdf_bytes
+
+            if st.session_state.get(key_sum):
+                st.markdown("**Executive Summary:**")
+                st.info(st.session_state[key_sum])
+
+            if st.session_state.get(key_dl):
+                st.download_button(
+                    label=f"Last ned {ticker}_earnings_brief.pdf",
+                    data=st.session_state[key_dl],
+                    file_name=f"{ticker}_earnings_brief.pdf",
+                    mime="application/pdf",
+                    key=f"dl_btn_{ticker}",
+                )
+
+    st.divider()
 
 # ── Kjør monitor nå ───────────────────────────────────────────────────────────
 st.markdown("#### Kjør monitor")

@@ -125,6 +125,15 @@ def update_baseline(ticker: str, new_price: float) -> None:
 def is_in_watchlist(ticker: str) -> bool:
     return any(w.get("ticker") == ticker for w in load_watchlist())
 
+
+def update_brief_sent(ticker: str, date_str: str) -> None:
+    """Lagrer datoen earnings brief ble sendt for en ticker."""
+    watchlist = load_watchlist()
+    for entry in watchlist:
+        if entry.get("ticker") == ticker:
+            entry["last_brief_sent"] = date_str
+    save_watchlist(watchlist)
+
 def save_snapshot_cache(snapshot) -> None:
     os.makedirs(CACHE_PATH, exist_ok=True)
     key = (snapshot.ticker or snapshot.company_name.replace(" ", "_")).replace(".", "_")

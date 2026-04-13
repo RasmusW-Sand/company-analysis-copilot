@@ -10,7 +10,7 @@ import yfinance as yf
 from anthropic import Anthropic
 from watchlist.store import (
     load_watchlist, update_last_checked,
-    update_baseline
+    update_baseline, update_brief_sent,
 )
 from watchlist.notifier import send_alert
 
@@ -129,6 +129,58 @@ def check_earnings_upcoming(entry: dict) -> dict | None:
     return None
 
 
+def check_and_send_earnings_brief(entry: dict) -> bool:
+    """
+    Sender earnings brief hvis selskapet rapporterer i morgen.
+    Sjekker last_brief_sent for å unngå duplikater samme dag.
+    Returnerer True hvis brief ble sendt.
+    """
+    raw = entry.get("next_earnings_date")
+    if not raw:
+        return False
+
+    try:
+        earnings_date = date.fromisoformat(raw)
+        today         = date.today()
+
+        if (earnings_date - today).days != 1:
+            return False
+
+        # Duplikat-sjekk: allerede sendt i dag?
+        last_sent = entry.get("last_brief_sent")
+        if last_sent:
+            try:
+                if date.fromisoformat(last_sent) == today:
+                    print(f"  -> Brief allerede sendt i dag for {entry.get('ticker')}")
+                    return False
+            except ValueError:
+                pass
+
+        ticker       = entry.get("ticker")
+        company_name = entry.get("company_name", ticker)
+        print(f"  -> Genererer earnings brief for {ticker}...")
+
+        from agents.earnings_agent import EarningsAgent
+        from watchlist.notifier import send_earnings_brief
+
+        agent             = EarningsAgent()
+        briefing, pdf_bytes = agent.prepare_report(ticker)
+
+        send_earnings_brief(
+            ticker=ticker,
+            company_name=company_name,
+            report_date=raw,
+            pdf_bytes=pdf_bytes,
+            executive_summary=briefing.get("executive_summary", ""),
+        )
+        update_brief_sent(ticker, today.isoformat())
+        return True
+
+    except Exception as e:
+        print(f"Feil ved generering av earnings brief for {entry.get('ticker')}: {e}")
+        return False
+
+
 def run_monitor() -> None:
     """
     Kjører gjennom hele watchlisten og sender
@@ -167,6 +219,16 @@ def run_monitor() -> None:
         earnings_alert = check_earnings_upcoming(entry)
         if earnings_alert:
             all_alerts.append(earnings_alert)
+
+        # Send earnings brief kvelden før rapport
+        brief_sent = check_and_send_earnings_brief(entry)
+        if brief_sent:
+            all_alerts.append({
+                "ticker":  ticker,
+                "company": entry.get("company_name", ticker),
+                "trigger": "Earnings brief sendt",
+                "detail":  f"Rapporterer {entry.get('next_earnings_date')}",
+            })
 
         update_last_checked(ticker)
 

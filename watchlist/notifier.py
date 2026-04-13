@@ -2,6 +2,8 @@ import smtplib
 import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 from datetime import datetime
 
 
@@ -34,6 +36,71 @@ def send_alert(subject: str, alerts: list[dict]) -> None:
         print(f"Varsel sendt til {email_to}")
     except Exception as e:
         print(f"Kunne ikke sende e-post: {e}")
+
+
+def send_earnings_brief(
+    ticker: str,
+    company_name: str,
+    report_date: str,
+    pdf_bytes: bytes,
+    executive_summary: str = "",
+) -> None:
+    """
+    Sender e-post med earnings brief PDF som vedlegg.
+    Bruker MIMEMultipart('mixed') for vedlegg-støtte.
+    """
+    email_from     = os.getenv("EMAIL_FROM")
+    email_to       = os.getenv("EMAIL_TO")
+    email_password = os.getenv("EMAIL_PASSWORD")
+
+    if not all([email_from, email_to, email_password]):
+        print("E-post ikke konfigurert — sjekk .env")
+        return
+
+    subject = f"Earnings Brief: {company_name} rapporterer {report_date}"
+
+    msg            = MIMEMultipart("mixed")
+    msg["Subject"] = subject
+    msg["From"]    = email_from
+    msg["To"]      = email_to
+
+    # HTML-body
+    summary_html = (
+        f"<p><strong>Executive Summary:</strong><br>{executive_summary}</p>"
+        if executive_summary else ""
+    )
+    html = f"""
+    <html><body style="font-family:Arial,sans-serif;color:#212529;">
+        <h2 style="color:#0f2d4a;">Earnings Intelligence Brief</h2>
+        <p style="color:#6c757d;">{datetime.now().strftime('%d.%m.%Y %H:%M')}</p>
+        <p><strong>{company_name} ({ticker})</strong> rapporterer kvartalsresultat
+           <strong>{report_date}</strong>.</p>
+        {summary_html}
+        <p>Se vedlagt PDF for full analyse.</p>
+        <p style="color:#6c757d;font-size:12px;margin-top:20px;">
+            Company Analysis Copilot · Kun til informasjonsformål
+        </p>
+    </body></html>
+    """
+    msg.attach(MIMEText(html, "html"))
+
+    # PDF-vedlegg
+    part = MIMEBase("application", "pdf")
+    part.set_payload(pdf_bytes)
+    encoders.encode_base64(part)
+    part.add_header(
+        "Content-Disposition", "attachment",
+        filename=f"{ticker}_earnings_brief.pdf",
+    )
+    msg.attach(part)
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(email_from, email_password)
+            server.sendmail(email_from, email_to, msg.as_string())
+        print(f"Earnings brief sendt til {email_to}")
+    except Exception as e:
+        print(f"Kunne ikke sende earnings brief: {e}")
 
 
 def _build_html(alerts: list[dict]) -> str:

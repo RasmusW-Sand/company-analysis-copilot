@@ -48,17 +48,26 @@ st.markdown("""
 st.title("Company Analysis Copilot")
 st.caption("Nordisk M&A og investor analyse — ticker, årsrapport eller nettside")
 
+# Hent eventuell ticker sendt fra Screening-siden, og nullstill den med én gang
+_pending = st.session_state.pop("pending_ticker", None)
+
 # ── Input ────────────────────────────────────────────────────────────────────
 col_input, col_btn = st.columns([4, 1])
 with col_input:
     user_input = st.text_input(
         label="Input",
+        value=_pending or "",
         placeholder="f.eks. EQNR.OL, KAHOT.OL, eller lim inn URL til IR-side",
         label_visibility="collapsed"
     )
 with col_btn:
     analyse_btn  = st.button("Analyser", type="primary", use_container_width=True)
     force_reload = st.button("Tving ny analyse", type="secondary", use_container_width=True)
+
+# Auto-trigger hvis siden ble åpnet fra Screening
+if _pending and not analyse_btn:
+    analyse_btn = True
+    user_input  = _pending
 
 # PDF-upload
 uploaded_pdf = st.file_uploader(
@@ -275,5 +284,6 @@ if snapshot:
             )
             if st.button("Legg til i watchlist", type="primary"):
                 add_to_watchlist(snapshot, price_threshold_pct=threshold)
+                st.session_state["watchlist_updated"] = True
                 st.success(f"{snapshot.ticker} lagt til i watchlisten!")
                 st.rerun()
