@@ -1,9 +1,7 @@
 # Company Analysis Copilot
 
 AI-drevet selskapsanalyse og M&A intelligence platform for
-nordiske markeder. Bygget for å automatisere arbeidet en
-analytiker bruker timer på — fra selskapsanalyse til
-deal screening og earnings prep.
+nordiske markeder.
 
 ## Funksjonalitet
 
