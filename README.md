@@ -49,7 +49,7 @@ deal screening og earnings prep.
 - Vurderer M&A-implikasjoner av rapporten
 - Foreslår spørsmål til management
 - Sendes automatisk på e-post kvelden før rapport
-- 3-siders PDF i investment bank-stil
+- 3-siders PDF
 
 ### Agent Log
 
@@ -59,27 +59,69 @@ deal screening og earnings prep.
 
 ## Teknisk arkitektur
 
-Input (ticker / PDF / URL)
-↓
-Input Router — detekterer type, normaliserer til tekst
-↓
-LLM Extraction — Claude ekstraherer strukturert JSON
-↓
-Financial Enrichment — yfinance med live valutakurser
-↓
-Peer Enrichment — peer group og multippeldata
-↓
-Snapshot Builder — merger alt til CompanySnapshot
-↓
-Dashboard + PDF Export — Streamlit UI og ReportLab PDF
-Parallelt:
-Watchlist Monitor — daglig agent-kjøring via scheduler
-↓
-News Agent — Claude vurderer nyhetsvesentlighet
-↓
-Earnings Prep Agent — briefing + web search kontekst
-↓
-Email Notifier — HTML-rapport med PDF-vedlegg
+```
+┌─────────────────────────────────────────────────────────┐
+│                        INPUT                            │
+│         Ticker / PDF-årsrapport / IR-nettside           │
+└─────────────────────┬───────────────────────────────────┘
+                      │
+                      ▼
+              [ Input Router ]
+         Detekterer type, normaliserer
+                      │
+                      ▼
+             [ LLM Extraction ]
+          Claude → strukturert JSON
+                      │
+            ┌─────────┴─────────┐
+            ▼                   ▼
+  [ Financial Enrichment ] [ Peer Enrichment ]
+   yfinance + valutakurs    peer group + multippel
+            └─────────┬─────────┘
+                      ▼
+           [ Snapshot Builder ]
+        Merger alt til CompanySnapshot
+                      │
+            ┌─────────┴─────────┐
+            ▼                   ▼
+       [ Dashboard ]       [ PDF Export ]
+       Streamlit UI        ReportLab 1-side
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                    AUTOMATISK OVERVÅKING
+
+[ Task Scheduler ] ──► [ Watchlist Monitor ]
+                              │
+                    ┌─────────┴──────────┐
+                    ▼                    ▼
+            [ News Agent ]    [ Earnings Prep Agent ]
+          Claude vurderer      Briefing + web search
+          nyhetsvesentlighet   geopolitisk kontekst
+                    └─────────┬──────────┘
+                              ▼
+                    [ Email Notifier ]
+                   HTML-rapport + PDF-vedlegg
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                      DEAL SCREENING
+
+[ 125+ Nordiske tickere ] ──► [ Screen Universe ]
+  Oslo Børs / Nasdaq Nordic    ThreadPoolExecutor
+                                      │
+                                      ▼
+                          [ Enrich Candidates ]
+                           M&A signal-flagg
+                                      │
+                                      ▼
+                           [ AI Rangering ]
+                          Claude + begrunnelse
+                                      │
+                                      ▼
+                            [ Shortlist UI ]
+                         Ett klikk → full analyse
+```
 
 ## Teknologistack
 
@@ -138,30 +180,42 @@ powershell -ExecutionPolicy Bypass -File setup_scheduler.ps1
 
 ## Prosjektstruktur
 
-├── app.py # Navigasjons-entry point
-├── 1_Watchlist.py # Landing page — watchlist og status
-├── models.py # CompanySnapshot dataclass
-├── pipeline/
-│ ├── router.py # Input-deteksjon
-│ ├── extractor.py # LLM extraction
-│ ├── financials.py # yfinance enrichment
-│ ├── peers.py # Peer group
-│ └── snapshot.py # Pipeline-koordinator
-├── agents/
-│ ├── screening_agent.py # Deal screening med 125+ tickere
-│ └── earnings_agent.py # Earnings prep med web search
-├── watchlist/
-│ ├── store.py # Watchlist persistering
-│ ├── monitor.py # Daglig overvåkingsagent
-│ └── notifier.py # E-postvarsler med vedlegg
-├── export/
-│ ├── pdf_export.py # Company snapshot PDF
-│ └── earnings_pdf.py # Earnings brief PDF
+```
+company-analysis-copilot/
+│
+├── app.py                          # Entry point — navigasjon
+├── 1_Watchlist.py                  # Landing page
+├── models.py                       # CompanySnapshot dataclass
+├── requirements.txt
+│
 ├── pages/
-│ ├── 2_Analyser.py # Selskapsanalyse
-│ ├── 3_Agent_Log.py # Agent-logg
-│ └── 4_Screening.py # Deal screening UI
+│   ├── 2_Analyser.py               # Selskapsanalyse
+│   ├── 3_Agent_Log.py              # Agent-logg og historikk
+│   └── 4_Screening.py             # Deal screening UI
+│
+├── pipeline/
+│   ├── router.py                   # Input-deteksjon og normalisering
+│   ├── extractor.py                # LLM extraction → JSON
+│   ├── financials.py               # yfinance + valutakonvertering
+│   ├── peers.py                    # Peer group og multippeldata
+│   └── snapshot.py                 # Pipeline-koordinator
+│
+├── agents/
+│   ├── screening_agent.py          # Deal screening, 125+ tickere
+│   └── earnings_agent.py           # Earnings prep + web search
+│
+├── watchlist/
+│   ├── store.py                    # JSON-persistering + cache
+│   ├── monitor.py                  # Daglig overvåkingsagent
+│   └── notifier.py                 # E-post med PDF-vedlegg
+│
+├── export/
+│   ├── pdf_export.py               # Company snapshot — 1 side
+│   └── earnings_pdf.py             # Earnings brief — 3 sider
+│
 ├── prompts/
-│ └── extraction.py # LLM-prompts
-├── run_monitor.bat # Windows bat-script
-└── setup_scheduler.ps1 # Task Scheduler oppsett
+│   └── extraction.py               # LLM-prompts
+│
+├── run_monitor.bat                 # Windows bat-script
+└── setup_scheduler.ps1             # Task Scheduler oppsett
+```

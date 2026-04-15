@@ -7,3 +7,28 @@ Sjekker 1 selskaper...
 
 Ingen vesentlige endringer funnet.
 [13/04/2026  8:02:23.70] === Monitor fullfort OK === 
+ 
+[14/04/2026 21:01:14.84] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+
+1 trigger(e) funnet — sender varsel...
+Varsel sendt til sand.rasmusw@gmail.com
+[14/04/2026 21:18:14.27] === Monitor fullfort OK === 
+ 
+[15/04/2026 13:28:24.61] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+Feil ved prissjekk for CVX: 'NoneType' object is not subscriptable
+Feil ved nyhetssjekk for CVX: Failed to perform, curl: (6) Could not resolve host: query1.finance.yahoo.com. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  -> TGS.OL
+Feil ved prissjekk for TGS.OL: 'NoneType' object is not subscriptable
+Feil ved nyhetssjekk for TGS.OL: Failed to perform, curl: (6) Could not resolve host: query1.finance.yahoo.com. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  -> SDRL
+Feil ved prissjekk for SDRL: 'NoneType' object is not subscriptable
+Feil ved nyhetssjekk for SDRL: Failed to perform, curl: (6) Could not resolve host: query1.finance.yahoo.com. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+
+Ingen vesentlige endringer funnet.
+[15/04/2026 13:29:18.33] === Monitor fullfort OK === 
