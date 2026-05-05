@@ -32,3 +32,169 @@ Feil ved nyhetssjekk for SDRL: Failed to perform, curl: (6) Could not resolve ho
 
 Ingen vesentlige endringer funnet.
 [15/04/2026 13:29:18.33] === Monitor fullfort OK === 
+ 
+[16/04/2026 11:08:11.89] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+
+Ingen vesentlige endringer funnet.
+[16/04/2026 11:09:20.21] === Monitor fullfort OK === 
+ 
+[17/04/2026 10:28:23.99] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+
+Ingen vesentlige endringer funnet.
+[17/04/2026 10:30:11.15] === Monitor fullfort OK === 
+ 
+[18/04/2026 11:06:30.64] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+
+Ingen vesentlige endringer funnet.
+[18/04/2026 11:12:14.94] === Monitor fullfort OK === 
+ 
+[20/04/2026 10:04:52.05] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+Feil ved prissjekk for CVX: 'NoneType' object is not subscriptable
+  -> TGS.OL
+  -> SDRL
+
+Ingen vesentlige endringer funnet.
+[20/04/2026 10:06:22.27] === Monitor fullfort OK === 
+ 
+[20/04/2026 10:10:41.33] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+
+Ingen vesentlige endringer funnet.
+[20/04/2026 10:11:07.11] === Monitor fullfort OK === 
+ 
+[21/04/2026  9:36:11.27] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+Feil ved prissjekk for CVX: 'NoneType' object is not subscriptable
+Feil ved nyhetssjekk for CVX: Failed to perform, curl: (6) Could not resolve host: query1.finance.yahoo.com. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  -> TGS.OL
+Feil ved prissjekk for TGS.OL: 'NoneType' object is not subscriptable
+Feil ved nyhetssjekk for TGS.OL: Failed to perform, curl: (6) Could not resolve host: query1.finance.yahoo.com. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  -> SDRL
+Feil ved prissjekk for SDRL: 'NoneType' object is not subscriptable
+Feil ved nyhetssjekk for SDRL: Failed to perform, curl: (6) Could not resolve host: query1.finance.yahoo.com. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+
+Ingen vesentlige endringer funnet.
+[21/04/2026  9:36:35.05] === Monitor fullfort OK === 
+ 
+[22/04/2026  9:17:47.95] === Monitor startet === 
+ 
+[23/04/2026  9:19:21.67] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+
+1 trigger(e) funnet — sender varsel...
+Varsel sendt til sand.rasmusw@gmail.com
+[23/04/2026  9:19:56.77] === Monitor fullfort OK === 
+ 
+[24/04/2026  9:53:14.03] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+
+Ingen vesentlige endringer funnet.
+[24/04/2026  9:53:42.52] === Monitor fullfort OK === 
+ 
+[25/04/2026  8:18:29.40] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+
+Ingen vesentlige endringer funnet.
+[25/04/2026  8:19:12.78] === Monitor fullfort OK === 
+ 
+[26/04/2026  9:10:49.73] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+
+Ingen vesentlige endringer funnet.
+[26/04/2026  9:11:24.78] === Monitor fullfort OK === 
+ 
+[28/04/2026 17:36:53.74] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+Feil ved prissjekk for CVX: 'NoneType' object is not subscriptable
+Feil ved nyhetssjekk for CVX: Failed to perform, curl: (6) Could not resolve host: query1.finance.yahoo.com. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  -> TGS.OL
+Feil ved prissjekk for TGS.OL: 'NoneType' object is not subscriptable
+Feil ved nyhetssjekk for TGS.OL: Failed to perform, curl: (6) Could not resolve host: query1.finance.yahoo.com. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  -> SDRL
+Feil ved prissjekk for SDRL: 'NoneType' object is not subscriptable
+Feil ved nyhetssjekk for SDRL: Failed to perform, curl: (6) Could not resolve host: query1.finance.yahoo.com. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+
+Ingen vesentlige endringer funnet.
+[28/04/2026 17:37:18.80] === Monitor fullfort OK === 
+ 
+[30/04/2026 20:14:44.29] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> Genererer earnings brief for CVX...
+Earnings brief sendt til sand.rasmusw@gmail.com
+  -> TGS.OL
+Feil ved nyhetssjekk for TGS.OL: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': "This request would exceed your organization's rate limit of 30,000 input tokens per minute (org: b73c611e-c7a9-4c75-9460-c04bc40c7b6a, model: claude-sonnet-4-20250514). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase."}, 'request_id': 'req_011CaaQtoSVmiLCvdTx9Vbc5'}
+  -> SDRL
+Feil ved nyhetssjekk for SDRL: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': "This request would exceed your organization's rate limit of 30,000 input tokens per minute (org: b73c611e-c7a9-4c75-9460-c04bc40c7b6a, model: claude-sonnet-4-20250514). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase."}, 'request_id': 'req_011CaaQtz4xh7d7zEjfZnE3e'}
+
+2 trigger(e) funnet — sender varsel...
+Varsel sendt til sand.rasmusw@gmail.com
+[30/04/2026 20:16:08.14] === Monitor fullfort OK === 
+ 
+[02/05/2026 18:32:45.96] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+
+Ingen vesentlige endringer funnet.
+[02/05/2026 18:33:36.43] === Monitor fullfort OK === 
+ 
+[03/05/2026 17:57:29.59] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+
+Ingen vesentlige endringer funnet.
+[03/05/2026 17:58:00.51] === Monitor fullfort OK === 
+ 
+[04/05/2026 12:06:12.43] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+
+1 trigger(e) funnet — sender varsel...
+Varsel sendt til sand.rasmusw@gmail.com
+[04/05/2026 12:06:55.78] === Monitor fullfort OK === 
+ 
+[05/05/2026  8:00:01.85] === Monitor startet === 
+Sjekker 3 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+
+Ingen vesentlige endringer funnet.
+[05/05/2026  8:00:42.41] === Monitor fullfort OK === 
