@@ -45,10 +45,12 @@ def add_to_watchlist(
 
     # Hent nåværende pris som baseline
     current_price = None
+    currency = None
     if snapshot.ticker:
         try:
             info = yf.Ticker(snapshot.ticker).fast_info
             current_price = float(info.last_price)
+            currency = info.currency
         except Exception:
             pass
 
@@ -71,6 +73,7 @@ def add_to_watchlist(
         "added_at":            datetime.now().isoformat(),
         "last_checked":        datetime.now().isoformat(),
         "baseline_price":      current_price,
+        "currency":            currency,
         "price_threshold_pct": price_threshold_pct,
         "last_ev_ebitda":      snapshot.ev_ebitda,
         "headquarters":        snapshot.headquarters,
@@ -120,6 +123,46 @@ def update_baseline(ticker: str, new_price: float) -> None:
             entry["baseline_price"] = new_price
             entry["last_checked"]   = datetime.now().isoformat()
     save_watchlist(watchlist)
+
+
+_SUFFIX_CURRENCY = {
+    ".OL": "NOK",  # Oslo Børs
+    ".ST": "SEK",  # Stockholm
+    ".CO": "DKK",  # Copenhagen
+    ".HE": "EUR",  # Helsinki
+}
+
+
+def backfill_currencies() -> None:
+    """Fetches and stores missing currency fields for existing watchlist entries."""
+    import yfinance as yf
+    watchlist = load_watchlist()
+    changed = False
+    for entry in watchlist:
+        if entry.get("currency"):
+            continue
+        ticker = entry.get("ticker")
+        if not ticker:
+            continue
+        # Try yfinance first
+        currency = None
+        try:
+            currency = yf.Ticker(ticker).fast_info.currency or None
+        except Exception:
+            pass
+        # Fall back to exchange suffix
+        if not currency:
+            for suffix, code in _SUFFIX_CURRENCY.items():
+                if ticker.upper().endswith(suffix.upper()):
+                    currency = code
+                    break
+        # Default to USD for plain tickers (e.g. CVX, SDRL)
+        if not currency:
+            currency = "USD"
+        entry["currency"] = currency
+        changed = True
+    if changed:
+        save_watchlist(watchlist)
 
 
 def is_in_watchlist(ticker: str) -> bool:

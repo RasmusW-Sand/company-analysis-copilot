@@ -13,7 +13,7 @@ if st.session_state.get("watchlist_updated"):
     st.session_state["watchlist_updated"] = False
     st.rerun()
 
-from watchlist.store import load_watchlist
+from watchlist.store import load_watchlist, backfill_currencies
 
 PROJ_ROOT = Path(__file__).parent
 LOG_PATH  = PROJ_ROOT / "watchlist" / "monitor.log"
@@ -113,6 +113,14 @@ def next_earnings_entry(watchlist: list[dict]) -> tuple[str, str] | None:
     return None
 
 
+def _fmt_price(entry: dict) -> str:
+    price = entry.get("baseline_price")
+    if price is None:
+        return "N/A"
+    currency = entry.get("currency") or "N/A"
+    return f"{currency} {price:.2f}"
+
+
 def watchlist_dataframe(watchlist: list[dict]) -> pd.DataFrame:
     today = date.today()
     rows = []
@@ -130,7 +138,7 @@ def watchlist_dataframe(watchlist: list[dict]) -> pd.DataFrame:
             "Ticker":        e.get("ticker", ""),
             "Lagt til":      (e.get("added_at") or "")[:10],
             "Terskel":       f"{e.get('price_threshold_pct', 5.0):.1f}%",
-            "Baseline":      f"${e.get('baseline_price'):.2f}" if e.get("baseline_price") else "N/A",
+            "Baseline":      _fmt_price(e),
             "Neste rapport": ned if ned else "N/A",
             "Siste sjekk":   (e.get("last_checked") or "")[:16].replace("T", " "),
             "_days_until":   days_until,
@@ -142,6 +150,7 @@ def watchlist_dataframe(watchlist: list[dict]) -> pd.DataFrame:
 # ── UI ────────────────────────────────────────────────────────────────────────
 
 # Load data
+backfill_currencies()
 log       = read_log()
 watchlist = load_watchlist()
 last_run  = last_ok_run(log)

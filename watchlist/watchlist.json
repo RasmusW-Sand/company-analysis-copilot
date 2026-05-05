@@ -9,7 +9,8 @@
     "last_ev_ebitda": 11.2,
     "headquarters": "Houston, United States",
     "next_earnings_date": "2026-05-01",
-    "last_brief_sent": "2026-04-30"
+    "last_brief_sent": "2026-04-30",
+    "currency": "USD"
   },
   {
     "ticker": "TGS.OL",
@@ -21,7 +22,8 @@
     "last_ev_ebitda": 33.6,
     "headquarters": "Houston, United States",
     "next_earnings_date": "2026-04-14",
-    "last_brief_sent": "2026-04-13"
+    "last_brief_sent": "2026-04-13",
+    "currency": "NOK"
   },
   {
     "ticker": "SDRL",
@@ -32,6 +34,19 @@
     "price_threshold_pct": 6.0,
     "last_ev_ebitda": 10.6,
     "headquarters": "Houston, United States",
-    "next_earnings_date": "2026-05-11"
+    "next_earnings_date": "2026-05-11",
+    "currency": "USD"
+  },
+  {
+    "ticker": "EQNR.OL",
+    "company_name": "Equinor ASA",
+    "added_at": "2026-05-05T18:58:32.792523",
+    "last_checked": "2026-05-05T18:58:32.792523",
+    "baseline_price": 383.29998779296875,
+    "currency": "NOK",
+    "price_threshold_pct": 5.0,
+    "last_ev_ebitda": 26.9,
+    "headquarters": "Stavanger, Norway",
+    "next_earnings_date": "2026-05-06"
   }
 ]
