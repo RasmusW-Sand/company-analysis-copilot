@@ -18,6 +18,33 @@ from watchlist.notifier import send_alert
 client = Anthropic()
 
 
+def fetch_price_anchors(ticker: str) -> tuple[float | None, float | None]:
+    """Returnerer (forrige_close, dagens_åpning) for en ticker."""
+    try:
+        info = yf.Ticker(ticker).fast_info
+        prev_close = float(info.previous_close) if info.previous_close else None
+        today_open = float(info.open) if info.open else None
+        return prev_close, today_open
+    except Exception as e:
+        print(f"Feil ved henting av open/close for {ticker}: {e}")
+        return None, None
+
+
+def check_overnight_gap(entry: dict, prev_close: float, today_open: float) -> dict | None:
+    """Sjekker om kursen har hoppet over terskelen fra forrige close til dagens åpning."""
+    threshold = entry.get("price_threshold_pct", 5.0)
+    change    = ((today_open - prev_close) / prev_close) * 100
+    if abs(change) >= threshold:
+        direction = "opp" if change > 0 else "ned"
+        return {
+            "ticker":  entry.get("ticker"),
+            "company": entry.get("company_name", entry.get("ticker")),
+            "trigger": f"Overnight gap {direction} {abs(change):.1f}%",
+            "detail":  f"Forrige close {prev_close:.2f} → åpning {today_open:.2f}",
+        }
+    return None
+
+
 def check_price_movement(entry: dict) -> dict | None:
     """Sjekker om kursen har beveget seg mer enn terskelen."""
     ticker    = entry.get("ticker")
@@ -199,16 +226,23 @@ def run_monitor() -> None:
         ticker = entry.get("ticker")
         print(f"  -> {ticker}")
 
-        # Sjekk kurs
+        # Oppdater baseline til mest ferske ankerpris (åpning > forrige close)
+        prev_close, today_open = fetch_price_anchors(ticker)
+        anchor = today_open or prev_close
+        if anchor:
+            entry["baseline_price"] = anchor
+            update_baseline(ticker, anchor)
+
+        # Sjekk overnight gap (forrige close → dagens åpning)
+        if prev_close and today_open:
+            gap_alert = check_overnight_gap(entry, prev_close, today_open)
+            if gap_alert:
+                all_alerts.append(gap_alert)
+
+        # Sjekk intradag kursbevegelse fra åpningspris
         price_alert = check_price_movement(entry)
         if price_alert:
             all_alerts.append(price_alert)
-            # Oppdater baseline etter varsel
-            try:
-                new_price = float(yf.Ticker(ticker).fast_info.last_price)
-                update_baseline(ticker, new_price)
-            except Exception:
-                pass
 
         # Sjekk nyheter via Claude
         news_alert = check_news(entry)
