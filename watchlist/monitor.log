@@ -198,3 +198,14 @@ Sjekker 3 selskaper...
 
 Ingen vesentlige endringer funnet.
 [05/05/2026  8:00:42.41] === Monitor fullfort OK === 
+ 
+[06/05/2026  8:53:04.23] === Monitor startet === 
+Sjekker 4 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+  -> EQNR.OL
+
+1 trigger(e) funnet — sender varsel...
+Varsel sendt til sand.rasmusw@gmail.com
+[06/05/2026  8:54:05.89] === Monitor fullfort OK === 
