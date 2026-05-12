@@ -209,3 +209,78 @@ Sjekker 4 selskaper...
 1 trigger(e) funnet — sender varsel...
 Varsel sendt til sand.rasmusw@gmail.com
 [06/05/2026  8:54:05.89] === Monitor fullfort OK === 
+ 
+[07/05/2026 10:36:44.02] === Monitor startet === 
+Sjekker 4 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+  -> EQNR.OL
+
+Ingen vesentlige endringer funnet.
+[07/05/2026 10:38:17.82] === Monitor fullfort OK === 
+ 
+[08/05/2026  8:19:57.70] === Monitor startet === 
+Sjekker 4 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+  -> EQNR.OL
+
+Ingen vesentlige endringer funnet.
+[08/05/2026  8:20:33.07] === Monitor fullfort OK === 
+ 
+[10/05/2026  8:00:02.25] === Monitor startet === 
+HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: TRANS"}}}
+Sjekker 4 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+  -> Genererer earnings brief for SDRL...
+[EarningsAgent] Iterasjon 1
+[EarningsAgent] Tool call: get_financial_data({"ticker": "SDRL"})
+[EarningsAgent] Iterasjon 2
+[EarningsAgent] Tool call: get_peer_multiples({"tickers": ["TRANS", "VAL", "NE", "BORR"]})
+[EarningsAgent] Iterasjon 3
+[EarningsAgent] run_agent feilet (Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': "This request would exceed your organization's rate limit of 30,000 input tokens per minute (org: b73c611e-c7a9-4c75-9460-c04bc40c7b6a, model: claude-sonnet-4-20250514). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase."}, 'request_id': 'req_011CatNw9MTehdZ2o6baFGyp'}) — bruker fallback
+Earnings brief sendt til sand.rasmusw@gmail.com
+  -> EQNR.OL
+Feil ved nyhetssjekk for EQNR.OL: Error code: 429 - {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': "This request would exceed your organization's rate limit of 30,000 input tokens per minute (org: b73c611e-c7a9-4c75-9460-c04bc40c7b6a, model: claude-sonnet-4-20250514). For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://claude.com/contact-sales to discuss your options for a rate limit increase."}, 'request_id': 'req_011CatNwxkG23cL4h3FEeN8q'}
+
+2 trigger(e) funnet — sender varsel...
+Varsel sendt til sand.rasmusw@gmail.com
+[10/05/2026  8:01:18.64] === Monitor fullfort OK === 
+ 
+[11/05/2026  9:09:06.30] === Monitor startet === 
+Sjekker 4 selskaper...
+  -> CVX
+Feil ved henting av open/close for CVX: 'NoneType' object is not subscriptable
+Feil ved prissjekk for CVX: 'NoneType' object is not subscriptable
+Feil ved nyhetssjekk for CVX: Failed to perform, curl: (6) Could not resolve host: query1.finance.yahoo.com. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  -> TGS.OL
+Feil ved henting av open/close for TGS.OL: 'NoneType' object is not subscriptable
+Feil ved prissjekk for TGS.OL: 'NoneType' object is not subscriptable
+Feil ved nyhetssjekk for TGS.OL: Failed to perform, curl: (6) Could not resolve host: query1.finance.yahoo.com. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  -> SDRL
+Feil ved henting av open/close for SDRL: 'NoneType' object is not subscriptable
+Feil ved prissjekk for SDRL: 'NoneType' object is not subscriptable
+Feil ved nyhetssjekk for SDRL: Failed to perform, curl: (6) Could not resolve host: query1.finance.yahoo.com. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+  -> EQNR.OL
+Feil ved henting av open/close for EQNR.OL: 'NoneType' object is not subscriptable
+Feil ved prissjekk for EQNR.OL: 'NoneType' object is not subscriptable
+Feil ved nyhetssjekk for EQNR.OL: Failed to perform, curl: (6) Could not resolve host: query1.finance.yahoo.com. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+
+1 trigger(e) funnet — sender varsel...
+Kunne ikke sende e-post: [Errno 11001] getaddrinfo failed
+[11/05/2026  9:09:35.57] === Monitor fullfort OK === 
+ 
+[12/05/2026  8:00:02.62] === Monitor startet === 
+Sjekker 5 selskaper...
+  -> CVX
+  -> TGS.OL
+  -> SDRL
+  -> EQNR.OL
+  -> XOM
+
+Ingen vesentlige endringer funnet.
+[12/05/2026  8:00:59.59] === Monitor fullfort OK === 

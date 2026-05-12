@@ -1,6 +1,6 @@
 """
 Earnings Prep Agent
-Henter data, genererer analyse med Claude, og produserer PDF-briefing.
+Henter data, genererer analyse med Claude via agentic tool-use loop, og produserer PDF-briefing.
 """
 
 import json
@@ -10,6 +10,33 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import yfinance as yf
 from anthropic import Anthropic
+
+
+SYSTEM_PROMPT = """Du er en erfaren senior M&A- og equity-analytiker med spesialkompetanse
+på nordiske og internasjonale markeder. Du skal lage en profesjonell earnings briefing
+for et selskap som snart rapporterer kvartalsresultat.
+
+Du har tilgang til følgende verktøy:
+
+- get_financial_data(ticker): Henter finansdata fra yfinance — estimater, historikk,
+  kursmål, anbefalinger og kvartalstall. Kall dette først.
+- get_peer_multiples(tickers): Henter EV/EBITDA og P/E for sammenlignbare selskaper.
+  Bruk dette for å kontekstualisere verdivurderingen.
+- web_search: Søk etter ferske nyheter, analytiker-kommentarer, sektorutsikter og
+  makroøkonomiske faktorer som er relevante for rapporten.
+- write_briefing_section(section, content): Skriv én seksjon av briefingen. Kall dette
+  for hver seksjon etter hvert som du analyserer dataene.
+
+Arbeidsflyt:
+1. Hent finansdata med get_financial_data
+2. Søk etter fersk markedskontekst med web_search (minst 2-3 søk)
+3. Hent peer-multipler hvis relevant
+4. Skriv briefingen seksjon for seksjon med write_briefing_section
+
+Seksjonene du MÅ skrive: executive_summary, consensus_view, historical_performance,
+what_to_watch, key_risks, ma_angle, questions_for_management.
+
+Svar på norsk i alle seksjoner."""
 
 
 class EarningsAgent:
@@ -190,7 +217,185 @@ class EarningsAgent:
             "guidance_high":        guidance_high,
         }
 
-    # ── Claude-analyse ────────────────────────────────────────────────────────
+    def get_peer_multiples(self, tickers: list[str]) -> dict:
+        """Henter EV/EBITDA og P/E for en liste av sammenlignbare selskaper."""
+        results = {}
+        for t in tickers:
+            try:
+                info = yf.Ticker(t).info or {}
+                results[t] = {
+                    "company":  info.get("shortName", t),
+                    "ev_ebitda": _safe_float(info.get("enterpriseToEbitda")),
+                    "pe_ratio":  _safe_float(info.get("trailingPE")),
+                }
+            except Exception as e:
+                results[t] = {"error": str(e)}
+        return results
+
+    # ── Agentic tool-use loop ─────────────────────────────────────────────────
+
+    def run_agent(self, ticker: str) -> tuple[dict, dict]:
+        """
+        Kjører en agentic tool-use loop der Claude driver hele analyseflyten.
+        Returnerer (briefing_dict, data_dict).
+        """
+        briefing     = {}
+        fetched_data = {}
+
+        tools = [
+            {
+                "name": "get_financial_data",
+                "description": (
+                    "Henter finansdata for en ticker fra yfinance: EPS-estimater, "
+                    "omsetningsestimater, kursmål, analytiker-anbefalinger, "
+                    "kvartalsvise finanstall og beat/miss-historikk."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "ticker": {"type": "string", "description": "Ticker-symbol, f.eks. EQNR.OL eller CVX"}
+                    },
+                    "required": ["ticker"],
+                },
+            },
+            {
+                "name": "get_peer_multiples",
+                "description": (
+                    "Henter EV/EBITDA og P/E for en liste av sammenlignbare selskaper. "
+                    "Bruk dette for å kontekstualisere verdivurderingen av hovedselskapet."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "tickers": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Liste med ticker-symboler for peer-selskaper",
+                        }
+                    },
+                    "required": ["tickers"],
+                },
+            },
+            {
+                "type": "web_search_20250305",
+                "name": "web_search",
+            },
+            {
+                "name": "write_briefing_section",
+                "description": (
+                    "Skriv én seksjon av earnings briefingen. Kall dette én gang per seksjon "
+                    "etter at du har analysert relevante data. Alle 7 seksjoner må skrives."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "section": {
+                            "type": "string",
+                            "enum": [
+                                "executive_summary",
+                                "consensus_view",
+                                "historical_performance",
+                                "what_to_watch",
+                                "key_risks",
+                                "ma_angle",
+                                "questions_for_management",
+                                "sources_consulted",
+                            ],
+                            "description": "Navnet på seksjonen som skal skrives",
+                        },
+                        "content": {
+                            "description": (
+                                "Innholdet i seksjonen. Bruk streng for tekstfelter, "
+                                "liste for what_to_watch/key_risks/questions_for_management, "
+                                "og objekt for consensus_view og historical_performance."
+                            ),
+                        },
+                    },
+                    "required": ["section", "content"],
+                },
+            },
+        ]
+
+        messages = [
+            {
+                "role": "user",
+                "content": f"Lag en komplett earnings briefing for {ticker}.",
+            }
+        ]
+
+        MAX_ITERATIONS = 25
+        iteration = 0
+        while True:
+            iteration += 1
+            print(f"[EarningsAgent] Iterasjon {iteration}")
+
+            if iteration > MAX_ITERATIONS:
+                print(f"[EarningsAgent] Maks iterasjoner ({MAX_ITERATIONS}) nådd — avbryter loop")
+                break
+
+            response = self.client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=8192,
+                system=SYSTEM_PROMPT,
+                tools=tools,
+                messages=messages,
+            )
+
+            if response.stop_reason == "end_turn":
+                # Forsøk å hente supplerende JSON fra siste tekstblokk
+                for block in reversed(response.content):
+                    if hasattr(block, "text") and block.text.strip():
+                        try:
+                            raw = block.text.strip()
+                            if "```" in raw:
+                                raw = raw.split("```")[1]
+                                if raw.startswith("json"):
+                                    raw = raw[4:]
+                                raw = raw.split("```")[0]
+                            parsed = json.loads(raw.strip())
+                            briefing.update(parsed)
+                        except Exception:
+                            pass
+                        break
+                return briefing if briefing else self._fallback_briefing(ticker), fetched_data
+
+            elif response.stop_reason == "tool_use":
+                messages.append({"role": "assistant", "content": response.content})
+                tool_results = []
+                for block in response.content:
+                    if block.type == "tool_use":
+                        print(f"[EarningsAgent] Tool call: {block.name}({json.dumps(block.input, ensure_ascii=False)})")
+                        result = self._execute_tool(block.name, block.input, briefing, fetched_data)
+                        tool_results.append({
+                            "type":        "tool_result",
+                            "tool_use_id": block.id,
+                            "content":     json.dumps(result, ensure_ascii=False),
+                        })
+                if tool_results:
+                    messages.append({"role": "user", "content": tool_results})
+            else:
+                print(f"[EarningsAgent] Uventet stop_reason '{response.stop_reason}' — avbryter loop")
+                break
+
+        return briefing if briefing else self._fallback_briefing(ticker), fetched_data
+
+    def _execute_tool(self, name: str, inputs: dict, briefing: dict, fetched_data: dict) -> dict:
+        """Dispatcher for klient-side verktøy. web_search håndteres nativt av Anthropic."""
+        if name == "get_financial_data":
+            data = self.fetch_earnings_data(inputs["ticker"])
+            fetched_data.update(data)
+            return data
+
+        if name == "get_peer_multiples":
+            return self.get_peer_multiples(inputs["tickers"])
+
+        if name == "write_briefing_section":
+            briefing[inputs["section"]] = inputs["content"]
+            return {"ok": True, "section": inputs["section"]}
+
+        return {"error": f"Ukjent verktøy: {name}"}
+
+    # ── Claude-analyse (beholdt, brukes ikke lenger) ─────────────────────────
 
     def generate_briefing(self, ticker: str, data: dict) -> dict:
         """
@@ -264,7 +469,6 @@ class EarningsAgent:
 
         data_text = "\n".join(lines)
 
-        # Estimer kvartal og år for søkeinstruksjoner
         next_e = data.get("next_earnings") or ""
         try:
             from datetime import datetime as _dt
@@ -274,7 +478,6 @@ class EarningsAgent:
         except Exception:
             q_num, q_year = "?", "?"
 
-        # Sektorhint basert på valuta / selskapsinfo (best-effort)
         sector_hint = f"{company} sector outlook {q_year}"
 
         prompt = f"""Du er en erfaren M&A- og equity-analytiker med spesialkompetanse på
@@ -341,8 +544,6 @@ ingen annen tekst:
                 messages=[{"role": "user", "content": prompt}],
             )
 
-            # Ekstraher kun text-blokker — response.content kan også inneholde
-            # tool_use- og tool_result-blokker fra web search
             full_response = ""
             for block in response.content:
                 if block.type == "text":
@@ -356,11 +557,9 @@ ingen annen tekst:
                     raw = raw[4:]
                 raw = raw.split("```")[0]
 
-            # Forsøk 1: direkte parsing
             try:
                 return json.loads(raw.strip())
             except json.JSONDecodeError:
-                # Forsøk 2: kutt ved siste komplette JSON-objekt
                 last_brace = raw.rfind("}")
                 if last_brace != -1:
                     truncated = raw[: last_brace + 1]
@@ -396,11 +595,19 @@ ingen annen tekst:
 
     def prepare_report(self, ticker: str) -> tuple[dict, bytes]:
         """
-        Koordinerer hele flyten: hent data → generer analyse → lag PDF.
+        Koordinerer hele flyten: kjør agentic loop → lag PDF.
         Returnerer (briefing_dict, pdf_bytes).
         """
-        data     = self.fetch_earnings_data(ticker)
-        briefing = self.generate_briefing(ticker, data)
+        try:
+            briefing, data = self.run_agent(ticker)
+        except Exception as e:
+            print(f"[EarningsAgent] run_agent feilet ({e}) — bruker fallback")
+            briefing = self._fallback_briefing(ticker)
+            data     = {}
+
+        # Sikkerhetsnett: hent rådata hvis Claude aldri kalte get_financial_data
+        if not data:
+            data = self.fetch_earnings_data(ticker)
 
         from export.earnings_pdf import generate_earnings_pdf
         pdf_bytes = generate_earnings_pdf(ticker, data, briefing)

@@ -57,7 +57,7 @@ with col_input:
     user_input = st.text_input(
         label="Input",
         value=_pending or "",
-        placeholder="f.eks. EQNR.OL, KAHOT.OL, eller lim inn URL til IR-side",
+        placeholder="f.eks. EQNR.OL, eller lim inn URL til IR-side",
         label_visibility="collapsed"
     )
 with col_btn:
